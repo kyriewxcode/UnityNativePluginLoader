@@ -1,4 +1,4 @@
-﻿# Unity Native Plugin Loader
+# Unity Native Plugin Loader
 
 ## 简介
 
@@ -21,7 +21,7 @@ public static class MyPlugin
 
 然后在类里加入Plugin里需要调用的函数相同返回值和形参的delegate，再写入Plugin中对应该delegate的Function，为Function加上 “PluginFunctionAttr” Attribute，Atrtribute里的functionName需要和Plugin里的FunctionName相同
 
-```C#
+```c#
 
 [PluginAttr("libNativePlugin")]
 public static class MyPlugin
@@ -38,7 +38,7 @@ public static class MyPlugin
 
 随后调用函数时就可以：
 
-```C#
+```c#
 NativePluginLoader.LoadAll(typeof(MyPlugin), pluginPath);
 Debug.Log(MyPlugin.native_add(1, 2));
 ```
@@ -47,7 +47,7 @@ Debug.Log(MyPlugin.native_add(1, 2));
 
 需要更换Plugin时，需要调用卸载方法，最好是在用完之后直接调用卸载
 
-```C#
+```c#
 NativePluginLoader.UnloadAll();
 ```
 
