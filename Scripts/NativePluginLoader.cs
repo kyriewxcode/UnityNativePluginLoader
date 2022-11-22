@@ -1,25 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
-using Unity.VisualScripting;
 using UnityEngine;
 
 namespace GTC.BEngine
 {
-    static class SystemLibrary
-    {
-        [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
-        public static extern IntPtr LoadLibrary(string fileName);
-
-        [DllImport("kernel32", SetLastError = true)]
-        public static extern bool FreeLibrary(IntPtr module);
-
-        [DllImport("kernel32")] public static extern IntPtr GetProcAddress(IntPtr module, string procName);
-
-        [DllImport("kernel32.dll")] public static extern uint GetLastError();
-    }
-
     [AttributeUsage(AttributeTargets.Class)]
     public class PluginAttr : Attribute
     {
@@ -42,66 +26,87 @@ namespace GTC.BEngine
         }
     }
 
-    [ExecuteAlways]
-    public class NativePluginLoader
+    public class NativePluginLoader : IDisposable
     {
         [DllImport("UnityInterface")] public static extern IntPtr GetUnityInterface();
 
-        private static NativePluginLoader instance;
+        private delegate void UnityPluginLoadDelegate(IntPtr unityInterfaces);
+        private delegate void UnityPluginUnloadDelegate();
 
         const string EXT = ".dll"; // TODO: Handle different platforms
-        private static Dictionary<string, IntPtr> m_LoadedPlugins = new();
+        private IntPtr m_DllPtr = IntPtr.Zero;
+        private string m_DLLName;
 
-        public static void LoadAll(Type type, string path)
+        public NativePluginLoader(Type type, string path)
         {
-            var typeAttributes = type.GetCustomAttributes(typeof(PluginAttr), true);
+            object[] typeAttributes = type.GetCustomAttributes(typeof(PluginAttr), true);
             if (typeAttributes.Length > 0)
             {
                 Debug.Assert(typeAttributes.Length == 1);
 
                 var typeAttribute = typeAttributes[0] as PluginAttr;
-                var pluginName = typeAttribute.pluginName + EXT;
-                if (!m_LoadedPlugins.TryGetValue(pluginName, out IntPtr pluginHandle))
-                {
-                    var pluginPath = path + "/" + pluginName;
-                    pluginHandle = SystemLibrary.LoadLibrary(pluginPath);
-                    if (pluginHandle == IntPtr.Zero)
-                        throw new Exception("Failed to load plugin [" + pluginPath + "]");
+                m_DLLName = typeAttribute.pluginName + EXT;
+                string pluginPath = path + "/" + m_DLLName;
 
-                    m_LoadedPlugins.Add(pluginName, pluginHandle);
-                }
+                // Load Plugins
+                m_DllPtr = LoadLibrary(pluginPath);
+                if (m_DllPtr == IntPtr.Zero) throw new Exception("Failed to load plugin [" + pluginPath + "]");
 
+                // Load Function
                 var fields = type.GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
                 foreach (var field in fields)
                 {
-                    var fieldAttributes = field.GetCustomAttributes(typeof(PluginFunctionAttr), true);
+                    object[] fieldAttributes = field.GetCustomAttributes(typeof(PluginFunctionAttr), true);
                     if (fieldAttributes.Length > 0)
                     {
                         Debug.Assert(fieldAttributes.Length == 1);
 
-                        var fieldAttribute = fieldAttributes[0] as PluginFunctionAttr;
-                        var functionName = fieldAttribute.functionName;
-
-                        var fnPtr = SystemLibrary.GetProcAddress(pluginHandle, functionName);
-                        if (fnPtr == IntPtr.Zero)
+                        if (fieldAttributes[0] is PluginFunctionAttr fieldAttribute)
                         {
-                            Debug.LogError($"Failed to find function [{functionName}] in plugin [{pluginName}]. Err: [{SystemLibrary.GetLastError()}]");
-                            continue;
+                            string functionName = fieldAttribute.functionName;
+
+                            var fnPtr = GetProcAddress(m_DllPtr, functionName);
+                            if (fnPtr == IntPtr.Zero)
+                            {
+                                Debug.LogError($"Failed to find function [{functionName}] in plugin [{m_DLLName}]. Err: [{GetLastError()}]");
+                                continue;
+                            }
+                            var fnDelegate = Marshal.GetDelegateForFunctionPointer(fnPtr, field.FieldType);
+                            field.SetValue(null, fnDelegate);
                         }
-                        var fnDelegate = Marshal.GetDelegateForFunctionPointer(fnPtr, field.FieldType);
-                        field.SetValue(null, fnDelegate);
                     }
                 }
+
+                // Invoke UnityPluginLoad
+                GetDelegate<UnityPluginLoadDelegate>("UnityPluginLoad")?.Invoke(GetUnityInterface());
             }
         }
 
-        public static void UnloadAll()
+        public void Dispose()
         {
-            foreach (var plugin in m_LoadedPlugins)
+            if (m_DllPtr != IntPtr.Zero)
             {
-                SystemLibrary.FreeLibrary(plugin.Value);
+                GetDelegate<UnityPluginUnloadDelegate>("UnityPluginUnload")?.Invoke();
+                FreeLibrary(m_DllPtr);
+                m_DllPtr = IntPtr.Zero;
             }
-            m_LoadedPlugins.Clear();
+            else
+            {
+                Debug.LogError(GetLastError());
+            }
         }
+
+        private TDelegate GetDelegate<TDelegate>(string funcName)
+        {
+            return m_DllPtr != IntPtr.Zero ? Marshal.GetDelegateForFunctionPointer<TDelegate>(GetProcAddress(m_DllPtr, funcName)) : default(TDelegate);
+        }
+
+        [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)] private static extern IntPtr LoadLibrary(string fileName);
+
+        [DllImport("kernel32", SetLastError = true)] private static extern bool FreeLibrary(IntPtr module);
+
+        [DllImport("kernel32")] private static extern IntPtr GetProcAddress(IntPtr module, string procName);
+
+        [DllImport("kernel32.dll")] private static extern uint GetLastError();
     }
 }

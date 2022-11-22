@@ -7,31 +7,22 @@ public static class MyPlugin
 {
     public delegate int AddDelegate(int a, int b);
     [PluginFunctionAttr("native_add")] public static AddDelegate native_add = null;
-
-    public delegate void UnityPluginLoadDelegate(IntPtr unityInterfaces);
-    [PluginFunctionAttr("UnityPluginLoad")]
-    public static UnityPluginLoadDelegate UnityPluginLoad = null;
-
-    public delegate void UnityPluginUnloadDelegate();
-    [PluginFunctionAttr("UnityPluginUnload")]
-    public static UnityPluginUnloadDelegate UnityPluginUnload = null;
 }
 
 public class NativePlugin : MonoBehaviour
 {
-    void OnEnable()
-    {
-        NativePluginLoader.LoadAll(typeof(MyPlugin), "Assets/Plugins");
+    private NativePluginLoader loader;
 
-        IntPtr unityInterface = NativePluginLoader.GetUnityInterface();
-        MyPlugin.UnityPluginLoad(unityInterface);
+    private void Start()
+    {
+        loader = new NativePluginLoader(typeof(MyPlugin), "Assets/Plugins");
 
         Debug.Log(MyPlugin.native_add(1, 2));
     }
 
-    private void OnDisable()
+    private void OnDestroy()
     {
-        MyPlugin.UnityPluginUnload();
-        NativePluginLoader.UnloadAll();
+        loader?.Dispose();
+        loader = null;
     }
 }

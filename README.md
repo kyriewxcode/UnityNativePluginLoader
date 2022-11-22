@@ -29,31 +29,27 @@ public static class MyPlugin
     public delegate int Sum(int a, int b);
     [PluginFunctionAttr("native_add")] public static Sum native_add = null;
 }
-
 ```
 
 这样就定义好了一个Plugin里的几个Functiion类
 
-然后在运行时，需要调用` NativePluginLoader.LoadAll(typeof(MyPlugin)mpluginPath);` 其中`typeof(MyPlugin)`为上述封装的Plugin类，`pluginPath`为Plugin的文件夹路径
+然后在运行时，直接实例化一个`NativePluginLoader` 其中`typeof(MyPlugin)`为上述封装的Plugin类，`pluginPath`为Plugin的文件夹路径
 
 随后调用函数时就可以：
 
 ```c#
-NativePluginLoader.LoadAll(typeof(MyPlugin), pluginPath);
+loader = new NativePluginLoader(typeof(MyPlugin), "Assets/Plugins");
 Debug.Log(MyPlugin.native_add(1, 2));
 ```
 
-
-
-需要更换Plugin时，需要调用卸载方法，最好是在用完之后直接调用卸载
+用完之后，直接对loader进行Dispose即可释放Plugin
 
 ```c#
-NativePluginLoader.UnloadAll();
+loader?.Dispose();
+loader = null;
 ```
 
-
-
-调用完卸载代码就可以随意更换DLL了 :)
+释放之后就可以随意更换DLL了 :)
 
 
 
@@ -61,9 +57,9 @@ NativePluginLoader.UnloadAll();
 
 ​	在[Unity官方文档](https://docs.unity3d.com/Manual/NativePluginInterface.html)中，在插件加载和卸载时，Unity会自动调用`UnityPluginLoad(UnityInterface* interface)`和`UnityPluginUnload()`，Unity的图形接口都包含在其中。但是这是在用DllImport的前提下才会触发，所以如果用本仓库方法手动加载Plugin时，必须先从一个单独的Plugin中拿到`UnityInterface`的指针，然后手动调用UnityPluginLoad并传入前面得到的指针参数。
 
-​	仓库中的 `Plugin/UnityInterface.dll` 中已经提供了相关接口，并且已经定义好Get方法，加载前只需调用`NativePluginLoader.GetUnityInterface()`可以直接拿到`UnityInterface`的指针。你只需要按照上述用法，在自定义Plugin中定义一个`UnityPluginLoad(UnityInterface* interface)`并且手动调用即可，并记得在卸载Plugin前手动调用`UnityPluginUnload`。
+​	仓库中的 `Plugin/UnityInterface.dll` 中已经提供了相关接口，并且已经进行内置调用，你只需要按照上述用法并且在Plugin里定义好`UnityPluginLoad(UnityInterface* interface)`和`UnityPluginUnload()`两个方法即可。
 
-​	所有示例都在`Test/NativePlugin.cs`中演示
+​	Plugin源代码位于`NativePlugin~`和`UnityInterface~`文件夹下，所有示例都在`Test/NativePlugin.cs`中演示。
 
 
 
