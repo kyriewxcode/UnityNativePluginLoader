@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.2.2)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(NativePlugin LANGUAGES CXX)
+project(UnityInterface LANGUAGES CXX)
 set(CXX_STANDARD 17)
 
 file(GLOB_RECURSE PLUGIN_SRC "*.cpp")

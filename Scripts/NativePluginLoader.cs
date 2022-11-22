@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace GTC.BEngine
@@ -43,6 +45,8 @@ namespace GTC.BEngine
     [ExecuteAlways]
     public class NativePluginLoader
     {
+        [DllImport("UnityInterface")] public static extern IntPtr GetUnityInterface();
+
         private static NativePluginLoader instance;
 
         const string EXT = ".dll"; // TODO: Handle different platforms
@@ -56,10 +60,10 @@ namespace GTC.BEngine
                 Debug.Assert(typeAttributes.Length == 1);
 
                 var typeAttribute = typeAttributes[0] as PluginAttr;
-                var pluginName = "/" + typeAttribute.pluginName;
+                var pluginName = typeAttribute.pluginName + EXT;
                 if (!m_LoadedPlugins.TryGetValue(pluginName, out IntPtr pluginHandle))
                 {
-                    var pluginPath = path + pluginName + EXT;
+                    var pluginPath = path + "/" + pluginName;
                     pluginHandle = SystemLibrary.LoadLibrary(pluginPath);
                     if (pluginHandle == IntPtr.Zero)
                         throw new Exception("Failed to load plugin [" + pluginPath + "]");

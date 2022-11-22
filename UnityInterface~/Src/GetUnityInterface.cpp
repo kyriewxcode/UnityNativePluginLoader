@@ -4,12 +4,13 @@
 extern "C"
 {
 #endif
-    int UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API native_add(int a, int b)
-    {
-        return a + b;
-    }
 
     IUnityInterfaces* g_unityInterfaces = nullptr;
+
+    IUnityInterfaces UNITY_INTERFACE_EXPORT* UNITY_INTERFACE_API GetUnityInterface()
+    {
+        return g_unityInterfaces;
+    }
 
     void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces)
     {
